@@ -1,0 +1,84 @@
+.admonitionblock {
+    padding: 8px 12px !important; 
+    margin: 8px 0 !important; 
+    border-radius: 6px !important; 
+    box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.1) !important; 
+    font-weight: 500 !important;
+    font-size: 14px !important; 
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    max-width: 80% !important; 
+    color: #000 !important; 
+  }
+  
+  
+  .admonitionblock.warning {
+    background-color: #ffe5e5 !important; 
+    border-left: 4px solid #dc3545 !important; 
+  }
+  
+  .admonitionblock.note {
+    background-color: #e3f2fd !important;
+    border-left: 4px solid #007bff !important; 
+  }
+  
+  .admonitionblock.tip {
+    background-color: #fff3cd !important; 
+    border-left: 4px solid #ffc107 !important; 
+  }
+  
+  .admonitionblock table {
+    all: unset !important; 
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  
+  .admonitionblock table tbody,
+  .admonitionblock table tr,
+  .admonitionblock table td {
+    all: unset !important;
+    display: contents !important;
+  }
+  
+ 
+  .admonitionblock .icon {
+    font-size: 18px !important; 
+    margin-right: 8px !important;
+    flex-shrink: 0 !important;
+  }
+  
+
+  .admonitionblock.warning .icon::before {
+    content: "⚠️"; 
+  }
+  .admonitionblock.note .icon::before {
+    content: "ℹ️"; 
+  }
+  .admonitionblock.tip .icon::before {
+    content: "💡"; 
+  }
+  
+
+  .admonitionblock .title {
+    font-size: 16px !important;
+    font-weight: bold !important;
+  }
+  
+  /* ✅ Set Title Colors */
+  .admonitionblock.warning .title {
+    color: #000000 !important; 
+  }
+  .admonitionblock.note .title {
+    color: #000000 !important; 
+  }
+  .admonitionblock.tip .title {
+    color: #000000 !important; 
+  }
+  
+  .admonitionblock .content {
+    flex-grow: 1 !important;
+  }

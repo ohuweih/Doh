@@ -1,0 +1,7 @@
+/* Strikethrough Text */
+.line-through {
+    text-decoration: line-through;
+    text-decoration-color: #ff4d4d;   /* Light red strikethrough for visibility */
+    text-decoration-thickness: 2px;   /* Slightly thicker line */
+    font-weight: 400;
+}

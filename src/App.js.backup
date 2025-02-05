@@ -1,0 +1,419 @@
+// RichTextEditor.js
+import React, { useCallback, useState, useEffect } from 'react';
+import { createEditor, Transforms, Range, Editor, Text  } from 'slate';
+import { Slate, Editable, withReact, ReactEditor } from 'slate-react';
+import Asciidoctor from 'asciidoctor';
+import Toolbar from './componets/Toolbar.js';
+import ImageUploadButton from './componets/ImageModal.js';
+
+
+const convertHtmlTableToAsciiDoc = (tableHtml) => {
+    const rows = [...tableHtml.matchAll(/<tr>(.*?)<\/tr>/gs)].map(match => match[1]);
+
+    let asciidocTable = "\n|===\n";
+
+    rows.forEach((row, rowIndex) => {
+        const cells = [...row.matchAll(/<td[^>]*>(.*?)<\/td>/gs)].map(cell => cell[1].trim());
+
+        if (cells.length > 0) {
+            asciidocTable += `| ${cells.join(' | ')}\n`;
+        }
+    });
+
+    asciidocTable += "|===\n";
+    return asciidocTable;
+};
+
+const convertHtmlToAsciiDoc = (html) => {
+    let asciidoc = html;
+
+    // Replace basic tags with AsciiDoc syntax
+    asciidoc = asciidoc.replace(
+        /<div\s+class="paragraph\s+text-center">\s*<p>(.*?)<\/p>\s*<\/div>/gi,
+        '[.text-center]\n$1'
+    );
+    asciidoc = asciidoc.replace(
+        /<div\s+class="paragraph\s+text-right">\s*<p>(.*?)<\/p>\s*<\/div>/gi,
+        '[.text-right]\n$1'
+    );
+    asciidoc = asciidoc.replace(
+        /<div\s+class="paragraph\s+text-left">\s*<p>(.*?)<\/p>\s*<\/div>/gi,
+        '[.text-left]\n$1'
+    );
+    asciidoc = asciidoc.replace(
+        /<div class="admonitionblock (note|tip|warning)">[\s\S]*?<div class="title">\s*(.*?)\s*<\/div>[\s\S]*?<td class="content">\s*(.*?)\s*<\/td>[\s\S]*?<\/div>/gis,
+        (_, type, title, content) => `${type.toUpperCase()}: ${content.trim()} \n`
+    );
+    asciidoc = asciidoc.replace(/\s*id="[^"]*"/g, '');
+    //asciidoc = asciidoc.replace(/<br\s*\/?>\s*/g, ' +\n');
+    asciidoc = asciidoc.replace(/<\/?p>/g, '');
+    asciidoc = asciidoc.replace(/<\/p>\s*<p>/g, '');
+    asciidoc = asciidoc.replace(/<strong>(.*?)<\/strong>/g, '**$1**'); // Bold
+    asciidoc = asciidoc.replace(/<em>(.*?)<\/em>/g, '_$1_'); // Italic
+    asciidoc = asciidoc.replace(/<code>(.*?)<\/code>/g, '`$1`'); // Monospace
+    asciidoc = asciidoc.replace(/<sub>(.*?)<\/sub>/g, '~$1~'); // Subscript
+    asciidoc = asciidoc.replace(/<sup>(.*?)<\/sup>/g, '^$1^'); // Superscript
+    asciidoc = asciidoc.replace(/<mark>(.*?)<\/mark>/g, '#$1#'); // Superscript
+    asciidoc = asciidoc.replace(/<h1>(.*?)<\/h1>/g, '= $1'); // Headers
+    asciidoc = asciidoc.replace(/<h2>(.*?)<\/h2>/g, '== $1');
+    asciidoc = asciidoc.replace(/<h3>(.*?)<\/h3>/g, '=== $1');
+    asciidoc = asciidoc.replace(/<h4>(.*?)<\/h4>/g, '==== $1'); // Headers
+    asciidoc = asciidoc.replace(/<h5>(.*?)<\/h5>/g, '===== $1');
+    asciidoc = asciidoc.replace(/<h6>(.*?)<\/h6>/g, '====== $1');
+    asciidoc = asciidoc.replace(/<\/?hr>/g, "'''");
+    asciidoc = asciidoc.replace(/<ul>/g, '').replace(/<\/ul>/g, ''); // Remove <ul>
+    asciidoc = asciidoc.replace(/<li>(.*?)<\/li>/g, '* $1'); // Unordered list
+    asciidoc = asciidoc.replace(/<a href="(.*?)">(.*?)<\/a>/g, 'link:$1[$2]'); // Links
+    asciidoc = asciidoc.replace(/<br\s*\/?>/g, '\n');
+    asciidoc = asciidoc.replace(/<table[^>]*>.*?<\/table>/gs, (tableHtml) => {
+        return convertHtmlTableToAsciiDoc(tableHtml);
+    });
+    asciidoc = asciidoc.replace(
+        /<img\s+src="data:(.*?);base64,(.*?)"\s+alt="(.*?)"\s*\/?>/gi,
+        'image::data:$1;base64,$2[$3]'
+    );
+    asciidoc = asciidoc.replace(
+        /<span\s+class="underline">(.*?)<\/span>/gi,
+        '[underline]#$1#'
+    );
+    asciidoc = asciidoc.replace(
+        /<span\s+class="line-through">(.*?)<\/span>/gi,
+        '[line-through]#$1#'
+    );
+    asciidoc = asciidoc.replace(/\s*class="[^"]*"/g, '');
+    asciidoc = asciidoc.replace(/<div>/g, '').replace(/<\/div>/g, '');
+    console.log("Print clean doc", asciidoc)
+    return asciidoc.trim();
+};
+
+const convertAsciiDocToEditorValue = (asciidoc) => {
+    const lines = asciidoc.split('\n');
+    return lines.map(line => {
+        // Detect base64 images
+        if (line.startsWith('image::data:')) {
+            return {
+                type: 'collapsible-image',
+                base64: line,
+                collapsed: true,
+                children: [{ text: '' }]
+            };
+        } else {
+            // Regular paragraph for other content
+            return {
+                type: 'paragraph',
+                children: [{ text: line }]
+            };
+        }
+    });
+};
+
+// Initialize Asciidoctor
+const asciidoctor = Asciidoctor();
+
+
+// Initial editor value
+const initialValue = [
+    {
+        type: 'paragraph',
+        children: [{ text: 'Welcome to your AsciiDoc rich text editor!' }],
+    },
+];
+
+const RichTextEditor = () => {
+    const [value, setValue] = useState(initialValue);
+    const [asciidocText, setAsciidocText] = useState('');
+    const [asciidocPreview, setAsciidocPreview] = useState('');
+    const [activeView, setActiveView] = useState('preview');
+    const [isRawMode, setIsRawMode] = useState(false);
+    
+    
+    const [editor] = useState(() => {
+        const e = withReact(createEditor());
+    
+        // Ensure Slate treats 'image' as a void element
+        const { isVoid } = e;
+        e.isVoid = (element) => element.type === 'image' ? true : isVoid(element);
+    
+        return e;
+    });
+    
+
+    const [isConverting, setIsConverting] = useState(false);
+
+    useEffect(() => {
+        if (isConverting) {
+            // Stop further updates to avoid infinite loops
+            setIsConverting(false);
+            return;
+        }
+    
+        // Convert editor value to raw AsciiDoc for preview
+        const asciidoc = value.map(node => {
+            if (node.type === 'collapsible-image') {
+                return node.base64;
+            } else {
+                return node.children.map(child => child.text).join('');
+            }
+        }).join('\n');
+    
+        setAsciidocText(asciidoc);
+        setAsciidocPreview(asciidoctor.convert(asciidoc));
+    
+    }, [value]);
+
+
+    const handleAsciiDocToEditor = () => {
+        const newEditorValue = convertAsciiDocToEditorValue(asciidocText);
+        setIsConverting(true);  // Prevent the infinite loop
+        setValue(newEditorValue);
+        console.log("new value", newEditorValue)
+    };
+    
+
+    const handleViewChange = (newView) => {
+        if (newView !== activeView) {
+            if (newView === 'raw') {
+                handleAsciiDocToEditor();  // Convert from rendered to raw AsciiDoc
+            }
+            setActiveView(newView);  // Update the current active view
+        }
+    };
+    
+
+    const handleRenderedEdit = (event) => {
+        let updatedHTML = event.target.innerHTML;
+
+        updatedHTML = updatedHTML
+            .replace(/<p>\s*<\/p>/g, '<br>')
+            .replace(/<\/p>s*<p>/g, '\n\n')
+
+        const updatedAsciiDoc = convertHtmlToAsciiDoc(updatedHTML);
+
+        if (updatedAsciiDoc !== asciidocText) {
+            setAsciidocText(updatedAsciiDoc);
+
+            Transforms.select(editor, {
+                anchor: Editor.start(editor, []),
+                focus: Editor.end(editor, []),
+            });
+            Transforms.delete(editor);
+            Transforms.insertNodes(editor, [{ type: 'paragraph', children: [{ text: updatedAsciiDoc }] }]);
+        }
+    };
+
+
+    // Handle editor changes
+    const handleEditorChange = (newValue) => {
+        setValue(newValue);
+
+        // Convert Slate value to AsciiDoc syntax
+        const asciidocText = newValue
+        .map((node) => node.children.map((child) => child.text).join(''))
+        .join('\n');
+        setAsciidocPreview(asciidoctor.convert(asciidocText));
+    };
+
+    let lastMouseDownTime = null;
+    
+    const handleMouseDown = () => {
+        lastMouseDownTime = Date.now();
+    };
+
+    const handleMouseUp = (editor) => {
+        const mouseUpTime = Date.now();
+        const duration = mouseUpTime - lastMouseDownTime;
+
+        const isDoubleClick = duration < 150;
+        const { selection } = editor;
+
+        if (selection && Range.isExpanded(selection)) {
+            const selectedText = Editor.string(editor, selection);
+
+            if (isDoubleClick) {
+                console.log("Double-click detected");
+                const trailingWhitespace = selectedText.match(/\s+$/);
+                if (trailingWhitespace) {
+                    const whitespaceLength = trailingWhitespace[0].length;
+                    const newFocusOffset = selection.focus.offset - whitespaceLength;
+        
+                    Transforms.setSelection(editor, {
+                        anchor: selection.anchor,
+                        focus: { path: selection.focus.path, offset: newFocusOffset },
+                    });
+                }
+            } else {
+                console.log("Click and drag detected")
+            }
+
+        }
+    };
+    const [visibleBase64Keys, setVisibleBase64Keys] = useState([]);
+
+    const renderElement = (props) => {
+        const { attributes, children, element } = props;
+    
+        if (element.type === 'collapsible-image') {
+            return (
+                <div {...attributes} style={{ margin: '10px 0' }}>
+                    <button
+                        onClick={() => {
+                            const path = ReactEditor.findPath(editor, element);
+                            Transforms.setNodes(
+                                editor,
+                                { collapsed: !element.collapsed },
+                                { at: path }
+                            );
+                        }}
+                        style={{ padding: '5px 10px', cursor: 'pointer' }}
+                    >
+                        {element.collapsed ? 'Show Image' : 'Hide Image'}
+                    </button>
+                    {!element.collapsed && (
+                        <img
+                            src={element.base64}
+                            alt="Embedded Image"
+                            style={{ display: 'block', marginTop: '10px', maxWidth: '100%' }}
+                        />
+                    )}
+                    {children}
+                </div>
+            );
+        }
+        return <p {...attributes}>{children}</p>;
+    };
+    
+    
+    // Empty decorater for a place holder
+    const decorate = useCallback(() => {
+        return [];  // No decorations for now
+    }, []);
+    
+
+    const toggleBase64Visibility = (key) => {
+        setVisibleBase64Keys((prevKeys) =>
+            prevKeys.includes(key)
+                ? prevKeys.filter((k) => k !== key)  // Hide if already visible
+                : [...prevKeys, key]  // Show if hidden
+        );
+    };
+
+    // THIS DOES NOT WORK YET LOL
+    const handleListKeydown = (event, editor) => {
+        const { selection } = editor;
+
+        if (!selection || !Range.isCollapsed(selection)) return;
+
+        const currentLine = Editor.string(editor, selection.anchor.path);
+        const unorderedMatch = currentLine.match(/^(\*+)\s/); // Match unordered list syntax (*, **, ***)
+        console.log("Match on", unorderedMatch)
+        const orderedMatch = currentLine.match(/^(\.+)\s/);   // Match ordered list syntax (., .., ...)
+        console.log("Match on", orderedMatch)
+        const isUnordered = Boolean(unorderedMatch);
+        const isOrdered = Boolean(orderedMatch);
+
+        if (event.key === 'Enter' && (isUnordered || isOrdered)) {
+            event.preventDefault();
+
+            const currentSyntaxMatch = isUnordered
+                ? currentLine.match(/^(\*+)\s/)
+                : currentLine.match(/^(\.+)\s/);
+
+            if (currentSyntaxMatch) {
+                const currentSyntax = currentSyntaxMatch[1];
+                const listSyntax = `${currentSyntax} `; // Keep the same level of syntax
+                Transforms.insertText(editor, `\n${currentSyntax} `);
+                console.log("Adding Syntax on Enter:", currentSyntax);
+            }
+        }
+
+        if (event.key === 'Tab' && !event.shiftKey && (isUnordered || isOrdered)) {
+            event.preventDefault();
+
+            const currentSyntaxMatch = isUnordered
+                ? currentLine.match(/^(\*+)\s/)
+                : currentLine.match(/^(\.+)\s/);
+
+            if (currentSyntaxMatch) {
+                const currentSyntax = currentSyntaxMatch[1];
+                const newSyntax = currentSyntax + (isUnordered ? '*' : '.');
+                const updatedLine = `${newSyntax} `;
+
+                const newNode = {
+                    type: 'list-item',
+                    children: [{ text: '' }],
+                };
+                Transforms.insertNodes(editor, newNode);
+
+                const { path } = selection.anchor;
+                const newPath = [path[0] + 1];
+
+                Transforms.select(editor, Editor.start(editor, newPath));
+                Transforms.insertText(editor, updatedLine);
+                console.log("Updated Current Line:", updatedLine);
+                console.log("Old Path:", path);
+                console.log("New Path:", newPath);
+                console.log("Inserted Syntax:", updatedLine);   
+            }
+        }
+
+        if (event.key === 'Tab' && event.shiftKey && (isUnordered || isOrdered)) {
+            event.preventDefault();
+        
+            const currentSyntaxMatch = isUnordered
+                ? currentLine.match(/^(\*+)\s/) // Match `*`, `**`, `***`, etc.
+                : currentLine.match(/^(\.+)\s/); // Match `.`, `..`, `...`, etc.
+        
+            if (currentSyntaxMatch) {
+                const currentSyntax = currentSyntaxMatch[1]; // Current syntax level
+                const parentSyntax = currentSyntax.slice(0, -1); // Remove one `*` or `.`
+                const currentLineWithoutSyntax = currentLine.replace(/^(\*+|\.+)\s/, '').trim(); // Remove syntax from the line
+        
+                // Replace the current line's syntax
+                const { path } = selection.anchor;
+                Transforms.delete(editor, { at: { path, offset: 0 }, distance: currentSyntax.length + 1, unit: 'character' }); // Remove current syntax and space
+                Transforms.insertText(editor, `${parentSyntax} ${currentLineWithoutSyntax}`); // Add reduced syntax and remaining text
+        
+                console.log("Current Syntax:", currentSyntax);
+                console.log("Parent Syntax:", parentSyntax);
+                console.log("Updated Line:", `${parentSyntax} ${currentLineWithoutSyntax}`);
+            }
+        }
+
+    };
+    // END OF NOT WORKING FUNCTION
+
+    return (
+    <div style={{ display: 'flex', flexDirection: 'row', gap: '20px', height: '100vh' }}>
+        
+        {/* Editor Area (Raw AsciiDoc or Rich Text Editor) */}
+        <div style={{ flex: 1, border: '1px solid #ccc', padding: '10px', overflowY: 'auto' }}>
+            <Slate editor={editor} initialValue={value} value={value} onChange={handleEditorChange}>
+                <Toolbar editor={editor} value={value} />
+                <Editable
+                    renderElement={renderElement}
+                    onKeyDown={(event) => handleListKeydown(event, editor)}
+                    onMouseDown={handleMouseDown}
+                    onMouseUp={() => handleMouseUp(editor)}
+                    onFocus={() => handleViewChange('preview')}
+                    onBlur={() => setActiveView('')}
+                    style={{ border: '1px solid #ccc', padding: '15px', minHeight: '200px' }}
+                />
+            </Slate>
+        </div>
+
+        {/* Rendered Preview Area */}
+        <div 
+            style={{ flex: 1, border: '1px solid #ccc', padding: '10px', overflowY: 'auto' }}
+            contentEditable={true}
+            suppressContentEditableWarning={true}
+            onFocus={() => handleViewChange('preview')}
+            onBlur={handleRenderedEdit}
+            className="preview-container"
+            dangerouslySetInnerHTML={{ __html: asciidocPreview }}
+        />
+    </div>
+);
+
+    
+};
+export default RichTextEditor;

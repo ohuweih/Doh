@@ -1,0 +1,7 @@
+/* Underlined Text */
+.underline {
+    text-decoration: underline;
+    text-decoration-color: #4a4a4a;  /* Subtle dark gray underline */
+    text-underline-offset: 3px;     /* Add spacing between text and underline */
+    font-weight: 500;               /* Slightly bold for better visibility */
+}

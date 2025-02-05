@@ -1,0 +1,108 @@
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 16px;
+    text-align: left;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  th, td {
+    padding: 10px;
+    border: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #0077cc;
+    color: white;
+    font-weight: bold;
+  }
+  
+  /* Alternating row colors */
+  tr:nth-child(even) {
+    background-color: #f8f8f8;
+  }
+  
+.table-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4); /* Dim the background */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .table-modal {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+    min-width: 300px;
+    text-align: center;
+  }
+  
+  .table-modal h3 {
+    margin-top: 0;
+  }
+  
+  .table-modal label {
+    display: block;
+    margin: 10px 0;
+  }
+  
+  .table-modal input {
+    width: 60px;
+    padding: 5px;
+    margin-left: 10px;
+  }
+  
+  .table-modal-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+  }
+  
+  .table-modal-actions button {
+    padding: 8px 12px;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  
+  .table-modal-actions button:first-child {
+    background: #007bff;
+    color: white;
+  }
+  
+  .table-modal-actions button:last-child {
+    background: #ccc;
+  }
+  
+  .asciidoc-table {
+    max-width: 100%;
+    width: auto; /* Table grows dynamically */
+    border-collapse: collapse;
+    table-layout: auto; /* Allow columns to resize based on content */
+  }
+  
+  .asciidoc-table th,
+  .asciidoc-table td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    overflow: hidden;
+    white-space: normal; /* Allow wrapping if necessary */
+    word-wrap: break-word; /* Break long words */
+    text-align: left;
+  }
+  
+  .asciidoc-table th {
+    background: #f3f3f3;
+    white-space: nowrap; /* Keep headers in a single line */
+  }
