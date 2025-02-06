@@ -1,7 +1,7 @@
 {
   "name": "doh",
   "version": "0.1.0",
-  "homepage": "/doh/build",
+  "homepage": ".",
   "private": true,
   "dependencies": {
     "ajv-keywords": "^5.1.0",
