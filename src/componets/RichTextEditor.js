@@ -2,19 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { createEditor, Transforms, Range, Editor, Path } from 'slate';
 import { Slate, Editable, withReact } from 'slate-react';
 import Toolbar from './Toolbar';
-import { useNavigate } from 'react-router-dom';
 import {  
     convertHtmlToAsciiDoc, 
     convertAsciiDocToEditorValue, 
     asciidoctor, 
     initialValue 
   } from './asciidocUtils';
+  import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";import Pages from "./Pages"; // Your dynamic AsciiDoc page renderer
 
 const RichTextEditor = () => {
     const [value, setValue] = useState(initialValue);
     const [asciidocText, setAsciidocText] = useState('');
     const [asciidocPreview, setAsciidocPreview] = useState('');
-    
+    const navigate = useNavigate();
     
     const [editor] = useState(() => {
         const e = withReact(createEditor());
@@ -37,7 +37,7 @@ const RichTextEditor = () => {
             .join('\n');
         setAsciidocText(asciidocText);
 
-        const htmlPreview = asciidoctor.convert(asciidocText);
+        const htmlPreview = asciidoctor.convert(asciidocText, { attributes: { showtitle: true } });
         setAsciidocPreview(htmlPreview);
     }, [value]);
 
@@ -223,65 +223,79 @@ const RichTextEditor = () => {
         <div>
             {/* Banner with Title and Buttons */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f4f4f4', padding: '10px', borderBottom: '1px solid #ccc' }}>
-                <button style={{ padding: '8px 16px', backgroundColor: '#ff6347', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                <button 
+                style={{ padding: '8px 16px', backgroundColor: '#ff6347', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                onClick={() => window.location.href = 'https://github.com/ohuweih/Doh/issues'}>
                     Report a Bug
                 </button>
-                <h1 style={{ 
-                    margin: 0, 
-                    fontSize: '36px', 
-                    color: 'rgba(21, 29, 133, 0.5)',  /* Bright orange */
-                    textShadow: '2px 2px 5px rgba(0, 0, 0, 0.5)',  /* Depth effect */
-                    fontWeight: 'bold', 
-                    fontFamily: 'Arial Black, Gadget, sans-serif',  /* Squared letters */
-                    letterSpacing: '4px',
-                    textTransform: 'uppercase'
+                <h1 
+                    onClick={() => navigate("/")}
+                    style={{ 
+                        margin: 0, 
+                        fontSize: '36px', 
+                        color: 'rgba(21, 29, 133, 0.5)',  /* Bright orange */
+                        textShadow: '2px 2px 5px rgba(0, 0, 0, 0.5)',  /* Depth effect */
+                        fontWeight: 'bold', 
+                        fontFamily: 'Arial Black, Gadget, sans-serif',  /* Squared letters */
+                        letterSpacing: '4px',
+                        textTransform: 'uppercase',
+                        cursor: 'pointer'
                 }}>
                     D'OH
                 </h1>
-                <button style={{ padding: '8px 16px', backgroundColor: '#4682b4', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                <button 
+                    style={{ padding: '8px 16px', backgroundColor: '#4682b4', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    onClick={() => navigate("/aboutus")}
+                >
                     About Us
                 </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'row', gap: '20px', height: '100vh' }}>
-                
-                {/* Editor Area (Raw AsciiDoc or Rich Text Editor) */}
-                <div style={{ flex: 1, border: '1px solid #ccc', padding: '10px', overflowY: 'auto' }}>
-                    <Slate editor={editor} initialValue={value} value={value} onChange={handleEditorChange}>
-                        <Toolbar editor={editor} value={value} />
-                        <Editable
-                            onKeyDown={(event) => {
-                                const currentLine = Editor.string(editor, editor.selection.anchor.path);
-                                console.log("Current line in onkey down function", currentLine)
-                                
-                                const lines = currentLine.split('\n');
-                                const lastLine = lines[lines.length - 1]; 
-                                console.log("Last Line:", lastLine); 
 
-                                const isUnordered = lastLine.match(/^(\*+)\s/);
-                                const isOrdered = lastLine.match(/^(\.+)\s/);
-                                if (isUnordered || isOrdered) {
-                                    handleListKeydown(event, editor, isUnordered, isOrdered);
-                                }
-                            }}
-                            onMouseDown={handleMouseDown}
-                            onMouseUp={() => handleMouseUp(editor)}
+            <Routes>
+                <Route path="/" element={
+                    <div style={{ display: 'flex', flexDirection: 'row', gap: '20px', height: '100vh' }}>
+                        
+                        {/* Editor Area (Raw AsciiDoc or Rich Text Editor) */}
+                        <div style={{ flex: 1, border: '1px solid #ccc', padding: '10px', overflowY: 'auto' }}>
+                            <Slate editor={editor} initialValue={value} value={value} onChange={handleEditorChange}>
+                                <Toolbar editor={editor} value={value} />
+                                <Editable
+                                    onKeyDown={(event) => {
+                                        const currentLine = Editor.string(editor, editor.selection.anchor.path);
+                                        console.log("Current line in onkey down function", currentLine)
+                                        
+                                        const lines = currentLine.split('\n');
+                                        const lastLine = lines[lines.length - 1]; 
+                                        console.log("Last Line:", lastLine); 
+
+                                        const isUnordered = lastLine.match(/^(\*+)\s/);
+                                        const isOrdered = lastLine.match(/^(\.+)\s/);
+                                        if (isUnordered || isOrdered) {
+                                            handleListKeydown(event, editor, isUnordered, isOrdered);
+                                        }
+                                    }}
+                                    onMouseDown={handleMouseDown}
+                                    onMouseUp={() => handleMouseUp(editor)}
+                                    onFocus={() => handleViewChange('preview')}
+                                    style={{ border: '1px solid #ccc', padding: '15px', minHeight: '200px' }}
+                                />
+                            </Slate>
+                        </div>
+                
+                        {/* Rendered Preview Area */}
+                        <div 
+                            style={{ flex: 1, border: '1px solid #ccc', padding: '10px', overflowY: 'auto' }}
+                            contentEditable={true}
+                            suppressContentEditableWarning={true}
                             onFocus={() => handleViewChange('preview')}
-                            style={{ border: '1px solid #ccc', padding: '15px', minHeight: '200px' }}
+                            onBlur={handleRenderedEdit}
+                            className="preview-container"
+                            dangerouslySetInnerHTML={{ __html: asciidocPreview }}
                         />
-                    </Slate>
-                </div>
-        
-                {/* Rendered Preview Area */}
-                <div 
-                    style={{ flex: 1, border: '1px solid #ccc', padding: '10px', overflowY: 'auto' }}
-                    contentEditable={true}
-                    suppressContentEditableWarning={true}
-                    onFocus={() => handleViewChange('preview')}
-                    onBlur={handleRenderedEdit}
-                    className="preview-container"
-                    dangerouslySetInnerHTML={{ __html: asciidocPreview }}
-                />
-            </div>
+                    </div>
+                } />
+                <Route path="/aboutus" element={<Pages page="/aboutus.adoc" pageHeader="About Us" />} />
+            </Routes>
         </div>
     );
 

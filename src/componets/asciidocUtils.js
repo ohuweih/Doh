@@ -1,4 +1,5 @@
 import Asciidoctor from 'asciidoctor';
+
 //HTMLtoAdoc(tableHtml, html, asciidocText)
 export const convertHtmlTableToAsciiDoc = (tableHtml) => {
     const rows = [...tableHtml.matchAll(/<tr>(.*?)<\/tr>/gs)].map(match => match[1]);
